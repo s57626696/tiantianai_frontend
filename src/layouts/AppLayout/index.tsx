@@ -10,12 +10,11 @@ import {
     PushpinOutlined,
     BulbOutlined,
 } from "@ant-design/icons";
-import {Routes, Route, useNavigate, useLocation, Navigate} from "react-router-dom";
 
+import {useNavigate, useLocation} from "react-router-dom";
 import {getLogo} from "../../api/system";
-import WorkbenchHome from "../../pages/Workbench";
-import B223 from "../../pages/Workbench/B223";
 import {BreadcrumbItem, useBreadcrumb} from "../../context/BreadcrumbContext";
+import AppRouter from "../../router";
 
 
 const {Header, Content} = Layout;
@@ -54,7 +53,7 @@ const AppLayout: React.FC = () => {
             case "B223":
                 newCrumbs.push({label: "竣工结算审核"});
                 setCrumbs(newCrumbs);
-                navigate("/B223");
+                navigate("/workbench/b223");
                 break;
             default:
                 alert(`尚未配置页面：${item.name}`);
@@ -89,10 +88,16 @@ const AppLayout: React.FC = () => {
     useEffect(() => {
         if (location.pathname === "/workbench") {
             setCrumbs([{label: "造价作业", path: "/workbench"}]);
-        } else if (location.pathname === "/B223") {
+        } else if (location.pathname === "/workbench/b223") {
             setCrumbs([
                 {label: "造价作业", path: "/workbench"},
                 {label: "竣工结算审核"},
+            ]);
+        } else if (location.pathname === "/workbench/b223/create") {
+            setCrumbs([
+                {label: "造价作业", path: "/workbench"},
+                {label: "竣工结算审核", path: "/workbench/b223"},
+                {label: "新建结算项目"},
             ]);
         }
     }, [location.pathname, setCrumbs]);
@@ -175,7 +180,7 @@ const AppLayout: React.FC = () => {
             <Content style={{padding: "24px", marginTop: 64, height: `calc(100vh - 64px)`, overflowY: "auto"}}>
                 {/* 面包屑 */}
                 <Breadcrumb
-                    style={{marginBottom:16}}
+                    style={{marginBottom: 16}}
                     items={crumbs.map((item, index) => ({
                         title: item.path ? (
                             <button
@@ -200,14 +205,15 @@ const AppLayout: React.FC = () => {
 
 
                 {/* 路由内容 */}
-                <Routes>
-                    <Route path="/" element={<Navigate to="/workbench"/>}/>
-                    <Route
-                        path="/workbench"
-                        element={<WorkbenchHome businessData={businessData} onBusinessClick={handleBusinessClick}/>}
-                    />
-                    <Route path="/B223" element={<B223/>}/>
-                </Routes>
+                {/*<Routes>*/}
+                {/*    <Route path="/" element={<Navigate to="/workbench"/>}/>*/}
+                {/*    <Route*/}
+                {/*        path="/workbench"*/}
+                {/*        element={<WorkbenchHome businessData={businessData} onBusinessClick={handleBusinessClick}/>}*/}
+                {/*    />*/}
+                {/*    <Route path="/B223" element={<B223/>}/>*/}
+                {/*</Routes>*/}
+                <AppRouter businessData={businessData} onBusinessClick={handleBusinessClick}/>
             </Content>
         </Layout>
     );

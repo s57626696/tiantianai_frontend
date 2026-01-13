@@ -12,6 +12,10 @@ import {
 } from "antd";
 import type {ColumnsType} from "antd/es/table";
 import {EnterOutlined, EditOutlined, InboxOutlined} from "@ant-design/icons";
+import {useNavigate} from "react-router-dom";
+
+// import Step1Receive from "./Step1Receive";
+
 
 const {Option} = Select;
 
@@ -34,6 +38,8 @@ const B223: React.FC = () => {
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
     const [data, setData] = useState<SettlementProject[]>([]);
+
+    const navigate = useNavigate(); // ✅ useNavigate 用于路由跳转
 
     useEffect(() => {
         loadData();
@@ -159,13 +165,13 @@ const B223: React.FC = () => {
             render: (v) => {
                 switch (v) {
                     case "准备阶段":
-                        return <Tag color="default" style={{textAlign:"center"}}>准备阶段</Tag>;
+                        return <Tag color="default" style={{textAlign: "center"}}>准备阶段</Tag>;
                     case "审查":
-                        return <Tag color="blue" style={{textAlign:"center"}}>审查</Tag>;
+                        return <Tag color="blue" style={{textAlign: "center"}}>审查</Tag>;
                     case "审定":
-                        return <Tag color="green" style={{textAlign:"center"}}>审定</Tag>;
+                        return <Tag color="green" style={{textAlign: "center"}}>审定</Tag>;
                     case "已归档":
-                        return <Tag style={{textAlign:"center"}}>已归档</Tag>;
+                        return <Tag style={{textAlign: "center"}}>已归档</Tag>;
                     default:
                         return <Tag>{v}</Tag>;
                 }
@@ -215,6 +221,11 @@ const B223: React.FC = () => {
         },
     ];
 
+    const handleCreate = () => {
+        // 点击新建按钮导航到 B223Create 页面
+        navigate("/workbench/b223/create");
+    };
+
     return (
         <div>
             <Card>
@@ -254,7 +265,7 @@ const B223: React.FC = () => {
                 {/* 工具栏 */}
                 <div style={{marginBottom: 16}}>
                     <Space>
-                        <Button type="primary">新建</Button>
+                        <Button type="primary" onClick={handleCreate}>新建</Button>
                         <Button>导出</Button>
                         <Button>导入</Button>
                     </Space>
