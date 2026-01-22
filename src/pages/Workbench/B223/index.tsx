@@ -1,25 +1,9 @@
-import React, {useEffect, useState} from "react";
-import {
-    Card,
-    Table,
-    Form,
-    Input,
-    Button,
-    Select,
-    Space,
-    Tag,
-    Tooltip,
-} from "antd";
-import type {ColumnsType} from "antd/es/table";
-import {EnterOutlined, EditOutlined, InboxOutlined} from "@ant-design/icons";
+import React, {useState, useEffect} from "react";
+import {Card, Table, Button, Space, Tag, Tooltip, Dropdown, Checkbox} from "antd";
+import type {ColumnType} from "antd/es/table";
+import {EnterOutlined, EditOutlined, InboxOutlined, SettingOutlined} from "@ant-design/icons";
 import {useNavigate} from "react-router-dom";
 
-// import Step1Receive from "./Step1Receive";
-
-
-const {Option} = Select;
-
-// 数据结构
 interface SettlementProject {
     id: number;
     constructionUnit: string;
@@ -27,25 +11,113 @@ interface SettlementProject {
     contractName: string;
     sendAmount: number;
     auditAmount: number;
-    diffAmount: number; // 审减金额
-    diffRate: number;   // 审减率 0.1234 = 12.34%
-    projectStatus: "准备阶段" | "审查" | "审定" | "已归档";
+    diffAmount: number;
+    diffRate: number;
+    projectStatus: "准备" | "审查" | "审定" | "归档";
     leader: string;
     createdAt: string;
 }
 
 const B223: React.FC = () => {
-    const [form] = Form.useForm();
+    const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [data, setData] = useState<SettlementProject[]>([]);
 
-    const navigate = useNavigate(); // ✅ useNavigate 用于路由跳转
+    // 默认显示列
+    const [visibleColumns, setVisibleColumns] = useState<string[]>([
+        "contractName",
+        "constructionUnit",
+        "contractor",
+        "sendAmount",
+        "projectStatus",
+    ]);
+
+    // 全部列定义
+    const allColumns: ColumnType<SettlementProject>[] = [
+        {title: "合同名称", dataIndex: "contractName", width: 240, align: "left"},
+        {title: "建设单位", dataIndex: "constructionUnit", width: 180, align: "left"},
+        {title: "施工单位", dataIndex: "contractor", width: 180, align: "left"},
+        {
+            title: "送审金额（元）",
+            dataIndex: "sendAmount",
+            width: 140,
+            align: "right",
+            render: (v: number) => v.toLocaleString(),
+        },
+        {
+            title: "审定金额（元）",
+            dataIndex: "auditAmount",
+            width: 140,
+            align: "right",
+            render: (v: number) => v.toLocaleString(),
+        },
+        {
+            title: "审减金额（元）",
+            dataIndex: "diffAmount",
+            width: 140,
+            align: "right",
+            render: (v: number) => v.toLocaleString(),
+        },
+        {
+            title: "审减率",
+            dataIndex: "diffRate",
+            width: 100,
+            align: "right",
+            render: (v: number) => `${(v * 100).toFixed(2)}%`,
+        },
+        {
+            title: "项目状态",
+            dataIndex: "projectStatus",
+            width: 140,
+            align: "center",
+            render: (v: SettlementProject["projectStatus"]) => {
+                switch (v) {
+                    case "准备":
+                        return <Tag color="default">准备</Tag>;
+                    case "审查":
+                        return <Tag color="blue">审查</Tag>;
+                    case "审定":
+                        return <Tag color="green">审定</Tag>;
+                    case "归档":
+                        return <Tag>归档</Tag>;
+                }
+            },
+        },
+        {title: "主审", dataIndex: "leader", width: 100, align: "center"},
+        {
+            title: "操作",
+            fixed: "right",
+            width: 140,
+            align: "center",
+            render: (_: any, record: SettlementProject) => (
+                <Space>
+                    <Tooltip title="进入合同">
+                        <Button
+                            type="text"
+                            icon={<EnterOutlined/>}
+                            onClick={() => console.log("进入合同", record.id)}
+                        />
+                    </Tooltip>
+                    <Tooltip title="编辑合同">
+                        <Button
+                            type="text"
+                            icon={<EditOutlined/>}
+                            onClick={() => console.log("编辑合同", record.id)}
+                        />
+                    </Tooltip>
+                    <Tooltip title="归档合同">
+                        <Button
+                            type="text"
+                            icon={<InboxOutlined/>}
+                            onClick={() => console.log("归档合同", record.id)}
+                        />
+                    </Tooltip>
+                </Space>
+            ),
+        },
+    ];
 
     useEffect(() => {
-        loadData();
-    }, []);
-
-    const loadData = async () => {
         setLoading(true);
         setTimeout(() => {
             setData([
@@ -71,217 +143,68 @@ const B223: React.FC = () => {
                     auditAmount: 7900000,
                     diffAmount: 100000,
                     diffRate: 0.0127,
-                    projectStatus: "准备阶段",
+                    projectStatus: "准备",
                     leader: "李四",
                     createdAt: "2026-01-09",
                 },
             ]);
             setLoading(false);
         }, 500);
-    };
+    }, []);
 
-    const onSearch = () => {
-        const values = form.getFieldsValue();
-        console.log("查询条件：", values);
-        // TODO: 后端接口筛选
-        loadData();
-    };
+    // 过滤出当前显示的列
+    const displayedColumns = allColumns.filter(
+        (col) =>
+            col.dataIndex === undefined ||
+            visibleColumns.includes(col.dataIndex.toString()) ||
+            col.title === "操作"
+    );
 
-    const onReset = () => {
-        form.resetFields();
-        loadData();
-    };
 
-    // 表格列
-    const columns: ColumnsType<SettlementProject> = [
-        {
-            title: "合同名称",
-            dataIndex: "contractName",
-            align: "center",
-            width: 240,
-            render: (v) => (
-                <div style={{textAlign: "left"}}>{v.toLocaleString()}</div> // 单元格右对齐
+    // 列显示菜单 items
+    const columnMenuItems = allColumns
+        .filter((col) => col.dataIndex && col.title !== "操作")
+        .map((col) => ({
+            key: col.dataIndex!.toString(),
+            label: (
+                <Checkbox
+                    checked={visibleColumns.includes(col.dataIndex!.toString())}
+                    onChange={(e) => {
+                        const checked = e.target.checked;
+                        setVisibleColumns((prev) =>
+                            checked
+                                ? [...prev, col.dataIndex!.toString()]
+                                : prev.filter((c) => c !== col.dataIndex!.toString())
+                        );
+                    }}
+                >
+                    {typeof col.title === "function" ? col.title({}) : col.title}
+                </Checkbox>
             ),
-        },
-        {
-            title: "建设单位",
-            dataIndex: "constructionUnit",
-            align: "center",
-            width: 180,
-            render: (v) => (
-                <div style={{textAlign: "left"}}>{v.toLocaleString()}</div> // 单元格右对齐
-            ),
-        },
-        {
-            title: "施工单位",
-            dataIndex: "contractor",
-            align: "center",
-            width: 180,
-            render: (v) => (
-                <div style={{textAlign: "left"}}>{v.toLocaleString()}</div> // 单元格右对齐
-            ),
-        },
-        {
-            title: "送审金额（元）",
-            dataIndex: "sendAmount",
-            align: "center",
-            width: 140,
-            render: (v) => (
-                <div style={{textAlign: "right"}}>{v.toLocaleString()}</div> // 单元格右对齐
-            ),
-        },
-        {
-            title: "审定金额（元）",
-            dataIndex: "auditAmount",
-            align: "center",
-            width: 140,
-            render: (v) => (
-                <div style={{textAlign: "right"}}>{v.toLocaleString()}</div> // 单元格右对齐
-            ),
-        },
-        {
-            title: "审减金额（元）",
-            dataIndex: "diffAmount",
-            align: "center",
-            width: 140,
-            render: (v) => (
-                <div style={{textAlign: "right"}}>{v.toLocaleString()}</div> // 单元格右对齐
-            ),
-        },
-        {
-            title: "审减率",
-            dataIndex: "diffRate",
-            align: "center",
-            width: 100,
-            render: (v) => (
-                <div style={{textAlign: "right"}}>{`${(v * 100).toFixed(2)}%`}</div> // 单元格右对齐
-            ),
-        },
-        {
-            title: "项目状态",
-            dataIndex: "projectStatus",
-            width: 140,
-            align: "center",
-            render: (v) => {
-                switch (v) {
-                    case "准备阶段":
-                        return <Tag color="default" style={{textAlign: "center"}}>准备阶段</Tag>;
-                    case "审查":
-                        return <Tag color="blue" style={{textAlign: "center"}}>审查</Tag>;
-                    case "审定":
-                        return <Tag color="green" style={{textAlign: "center"}}>审定</Tag>;
-                    case "已归档":
-                        return <Tag style={{textAlign: "center"}}>已归档</Tag>;
-                    default:
-                        return <Tag>{v}</Tag>;
-                }
-            },
-        },
-        {
-            title: "主审",
-            dataIndex: "leader",
-            align: "center",
-            width: 100,
-            render: (v) => (
-                <div style={{textAlign: "center"}}>{v.toLocaleString()}</div> // 单元格右对齐
-            ),
-        },
-        {
-            title: "操作",
-            fixed: "right",
-            width: 140,
-            align: "center",
-            render: (_, record) => (
-                <Space>
-                    <Tooltip title="进入合同">
-                        <Button
-                            type="text"
-                            icon={<EnterOutlined/>}
-                            onClick={() => console.log("进入合同", record.id)}
-                        />
-                    </Tooltip>
-
-                    <Tooltip title="编辑合同">
-                        <Button
-                            type="text"
-                            icon={<EditOutlined/>}
-                            onClick={() => console.log("编辑合同", record.id)}
-                        />
-                    </Tooltip>
-
-                    <Tooltip title="归档合同">
-                        <Button
-                            type="text"
-                            icon={<InboxOutlined/>}
-                            onClick={() => console.log("归档合同", record.id)}
-                        />
-                    </Tooltip>
-                </Space>
-            ),
-        },
-    ];
-
-    const handleCreate = () => {
-        // 点击新建按钮导航到 B223Create 页面
-        navigate("/workbench/b223/create");
-    };
+        }));
 
     return (
-        <div>
-            <Card>
-                {/* 查询区 */}
-                <Form form={form} layout="inline" style={{marginBottom: 16}}>
-                    <Form.Item name="contractName" label="合同名称">
-                        <Input placeholder="请输入合同名称" allowClear/>
-                    </Form.Item>
+        <Card>
+            <Space style={{marginBottom: 16}}>
+                <Button type="primary" onClick={() => navigate("/workbench/b223/create")}>
+                    新建
+                </Button>
+                <Dropdown menu={{items: columnMenuItems}} placement="bottomLeft">
+                    <Button icon={<SettingOutlined/>}>列显示</Button>
+                </Dropdown>
+                <Button>导出</Button>
+                <Button>导入</Button>
+            </Space>
 
-                    <Form.Item name="constructionUnit" label="建设单位">
-                        <Input placeholder="请输入建设单位" allowClear/>
-                    </Form.Item>
-
-                    <Form.Item name="contractor" label="施工单位">
-                        <Input placeholder="请输入施工单位" allowClear/>
-                    </Form.Item>
-
-                    <Form.Item name="projectStatus" label="项目状态">
-                        <Select placeholder="请选择" allowClear style={{width: 120}}>
-                            <Option value="准备阶段">准备阶段</Option>
-                            <Option value="审查">审查</Option>
-                            <Option value="审定">审定</Option>
-                            <Option value="已归档">已归档</Option>
-                        </Select>
-                    </Form.Item>
-
-                    <Form.Item>
-                        <Space>
-                            <Button type="primary" onClick={onSearch}>
-                                查询
-                            </Button>
-                            <Button onClick={onReset}>重置</Button>
-                        </Space>
-                    </Form.Item>
-                </Form>
-
-                {/* 工具栏 */}
-                <div style={{marginBottom: 16}}>
-                    <Space>
-                        <Button type="primary" onClick={handleCreate}>新建</Button>
-                        <Button>导出</Button>
-                        <Button>导入</Button>
-                    </Space>
-                </div>
-
-                {/* 表格 */}
-                <Table
-                    rowKey="id"
-                    loading={loading}
-                    columns={columns}
-                    dataSource={data}
-                    scroll={{x: 1500}}
-                    pagination={{pageSize: 10}}
-                />
-            </Card>
-        </div>
+            <Table
+                rowKey="id"
+                loading={loading}
+                columns={displayedColumns}
+                dataSource={data}
+                scroll={{x: 1500}}
+                pagination={{pageSize: 10}}
+            />
+        </Card>
     );
 };
 

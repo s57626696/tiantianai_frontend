@@ -2,13 +2,13 @@ import React from "react";
 import {BrowserRouter} from "react-router-dom";
 
 import { BreadcrumbProvider } from "./context/BreadcrumbContext";
-import AppLayout from "./layouts/AppLayout";
+import AppRouter from "./router";
 
 
 const App: React.FC = () => (
     <BreadcrumbProvider>
         <BrowserRouter>
-            <AppLayout/>
+            <AppRouter businessData={[]} onBusinessClick={() => {}} />
         </BrowserRouter>
     </BreadcrumbProvider>
 );

@@ -1,5 +1,5 @@
-import React from "react";
-import {Collapse, Row, Col, Button} from "antd";
+import React, { useEffect, useState } from "react";
+import { Collapse, Row, Col, Button, Spin } from "antd";
 
 interface BusinessItem {
     code: string;
@@ -14,17 +14,39 @@ interface BusinessCategory {
 }
 
 interface Props {
-    businessData: BusinessCategory[];
     onBusinessClick: (item: BusinessItem) => void;
 }
 
-const WorkbenchHome: React.FC<Props> = ({businessData, onBusinessClick}) => {
+const WorkbenchHome: React.FC<Props> = ({ onBusinessClick }) => {
+    const [businessData, setBusinessData] = useState<BusinessCategory[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchServices = async () => {
+            try {
+                setLoading(true);
+                const res = await fetch("http://127.0.0.1:8000/services/tree");
+                const data: BusinessCategory[] = await res.json();
+                setBusinessData(data);
+            } catch (err) {
+                console.error("获取服务失败：", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchServices();
+    }, []);
+
+    if (loading) {
+        return <Spin tip="正在加载服务..." style={{ marginTop: 100, display: "block" }} />;
+    }
+
     // 将 businessData 转换为 Collapse 所需的 items
     const collapseItems = businessData.map((category) => ({
         key: category.category_no.toString(),
         label: category.category_name.replace("类", ""),
         children: (
-            <Row gutter={[16, 16]} style={{marginTop: 8}}>
+            <Row gutter={[16, 16]} style={{ marginTop: 8 }}>
                 {category.children.map((item) => (
                     <Col xs={24} sm={12} md={8} lg={6} key={item.code}>
                         <Button
@@ -43,7 +65,7 @@ const WorkbenchHome: React.FC<Props> = ({businessData, onBusinessClick}) => {
                 ))}
             </Row>
         ),
-        style: {background: "#fff", borderRadius: 8, marginBottom: 16},
+        style: { background: "#fff", borderRadius: 8, marginBottom: 16 },
     }));
 
     return (
@@ -63,8 +85,8 @@ const WorkbenchHome: React.FC<Props> = ({businessData, onBusinessClick}) => {
             <Collapse
                 accordion
                 bordered={false}
-                style={{background: "transparent"}}
-                items={collapseItems} // 使用 items 替代 children
+                style={{ background: "transparent" }}
+                items={collapseItems}
             />
         </div>
     );

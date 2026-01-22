@@ -1,131 +1,277 @@
-import React, {useState} from "react";
-import {Card, Steps, Form, Input, Button, Space, message} from "antd";
+import React, {useEffect, useState} from "react";
+import {Form, Input, Select, Space, Tooltip, Button, message, Card, Typography, Upload} from "antd";
+import {FilePdfOutlined, FileTextOutlined, UploadOutlined} from "@ant-design/icons";
 import {useNavigate} from "react-router-dom";
-import Step1Receive from "./Step1Receive";
 
+const {Title} = Typography;
+const {Option} = Select;
 
-interface StepItem {
-    title: string;
+interface ContractItem {
+    id: number;
+    contract_no: string;
+    contract_name: string;
+    contract_status: string;
+    client?: string;
+    pdf_url?: string;
+    markdown_url?: string;
 }
 
-const steps: StepItem[] = [
-    {title: "基础信息"},
-    {title: "合同信息"},
-    {title: "费用明细"},
-    {title: "确认提交"},
-];
-
 const B223Create: React.FC = () => {
-    const [currentStep, setCurrentStep] = useState(0);
     const [form] = Form.useForm();
     const navigate = useNavigate();
 
-        // 👇 先定义空 state 和方法，避免 TS 报错
-    const [scannedFiles, setScannedFiles] = useState<any[]>([]);
+    const [contracts, setContracts] = useState<ContractItem[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [selectedContract, setSelectedContract] = useState<ContractItem | null>(null);
 
-    const next = async () => {
+    /** 🔹 加载合同列表 */
+    const fetchContracts = async (keyword?: string) => {
+        setLoading(true);
         try {
-            await form.validateFields();
-            setCurrentStep((prev) => prev + 1);
-        } catch (err) {
-            console.log("验证失败:", err);
+            const params = keyword ? `?keyword=${encodeURIComponent(keyword)}` : "";
+            const res = await fetch(`http://127.0.0.1:8000/contracts/${params}`);
+            const data = await res.json();
+            setContracts(data);
+        } catch (e) {
+            message.error("获取合同列表失败");
+        } finally {
+            setLoading(false);
         }
     };
 
-    const prev = () => setCurrentStep((prev) => prev - 1);
-
+    /** 🔹 提交 */
     const handleSubmit = async () => {
         try {
             const values = await form.validateFields();
-            console.log("提交数据:", values);
-            message.success("提交成功！");
+
+            const formData = new FormData();
+            formData.append("project_name", values.projectName);
+            formData.append("audit_type", values.auditType);
+            formData.append("contract_id", values.relatedContractId);
+
+            if (values.entrustFile && values.entrustFile.length > 0) {
+                formData.append("entrust_file", values.entrustFile[0].originFileObj);
+            }
+
+            const res = await fetch("http://127.0.0.1:8000/settlement-projects/", {
+                method: "POST",
+                body: formData,
+            });
+
+            if (!res.ok) throw new Error("创建失败");
+
+            message.success("项目创建成功");
             navigate("/workbench/b223");
-        } catch (err) {
-            console.log("提交失败:", err);
+
+        } catch (e) {
+            message.error("创建失败");
+        }
+    };
+
+
+    /** 首次加载 */
+    useEffect(() => {
+        fetchContracts();
+    }, []);
+
+    /** 选择合同 */
+    const handleContractChange = (contractId: number) => {
+        const contract = contracts.find(c => c.id === contractId) || null;
+        setSelectedContract(contract);
+
+        if (contract) {
+            form.setFieldsValue({
+                relatedContractId: contract.id,
+                projectName: contract.contract_name,
+            });
+        }
+    };
+
+    /** 🔹 预览 */
+    const handlePreview = async (type: "pdf" | "markdown") => {
+        if (!selectedContract) return;
+
+        if (type === "pdf") {
+            if (!selectedContract.pdf_url) {
+                message.warning("该合同没有 PDF 文件");
+                return;
+            }
+            const newWin = window.open("", "_blank");
+            if (newWin) {
+                newWin.document.write(`
+                <html>
+                    <head>
+                        <title>${selectedContract.contract_name} - PDF预览</title>
+                    </head>
+                    <body style="margin:0">
+                        <embed src="${selectedContract.pdf_url}" type="application/pdf" width="100%" height="100%"/>
+                    </body>
+                </html>
+            `);
+                newWin.document.close();
+            }
+        } else {
+            if (!selectedContract.markdown_url) {
+                message.warning("该合同没有 Markdown 文件");
+                return;
+            }
+
+            try {
+                const res = await fetch(selectedContract.markdown_url);
+                const text = await res.text();
+
+                const newWin = window.open("", "_blank");
+                if (newWin) {
+                    newWin.document.write(`
+                    <html>
+                        <head>
+                            <meta charset="UTF-8" />
+                            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vditor/dist/index.css" />
+                            <script src="https://cdn.jsdelivr.net/npm/vditor/dist/index.min.js"></script>
+                            <title>${selectedContract.contract_name} - Markdown预览</title>
+                            <style>
+                                html, body { margin:0; height:100%; }
+                                #vditor { height:100%; }
+                            </style>
+                        </head>
+                        <body>
+                            <div id="vditor"></div>
+                            <script>
+                                function initVditor() {
+                                    new Vditor('vditor', {
+                                        value: ${JSON.stringify(text)},
+                                        mode: 'ir',
+                                        preview: {only: true},
+                                        height: window.innerHeight
+                                    });
+                                }
+                                if (window.Vditor) {
+                                    initVditor();
+                                } else {
+                                    window.addEventListener('load', initVditor);
+                                }
+                            </script>
+                        </body>
+                    </html>
+                `);
+                    newWin.document.close();
+                }
+            } catch (e) {
+                message.error("加载 Markdown 文件失败");
+            }
         }
     };
 
     return (
         <Card>
-            {/* 步骤导航：直接用 items 属性 */}
-            <Steps
-                current={currentStep}
-                style={{marginBottom: 24}}
-                items={steps.map((item) => ({key: item.title, title: item.title}))}
-            />
+            <Title level={3}>新建结算审核项目</Title>
 
-            <Form form={form} layout="vertical"
-                  initialValues={{projectName: "", contractName: "", sendAmount: 0, auditAmount: 0}}>
+            <Form
+                form={form}
+                layout="vertical"
+                initialValues={{
+                    relatedContractId: undefined,
+                    projectName: "",
+                    auditType: "竣工结算审核",
+                    entrustFileUrl: "",
+                }}
+            >
+                {/* 1. 关联造价咨询合同 */}
+                <Form.Item
+                    label="关联造价咨询合同"
+                    name="relatedContractId"
+                    rules={[{required: true, message: "请选择一个关联合同"}]}
+                >
+                    <Select
+                        placeholder="搜索合同名称 / 编号"
+                        showSearch
+                        allowClear
+                        filterOption={false}
+                        onSearch={fetchContracts}
+                        onChange={handleContractChange}
+                        loading={loading}
+                    >
+                        {contracts.map(c => (
+                            <Option key={c.id} value={c.id}>
+                                {c.contract_name}
+                            </Option>
+                        ))}
+                    </Select>
+                </Form.Item>
 
-                {currentStep === 0 && (
-                    <Step1Receive value={scannedFiles} onChange={setScannedFiles}/>
+                {/* 合同预览 */}
+                {selectedContract && (
+                    <Form.Item label="合同预览">
+                        <Space>
+                            {selectedContract.pdf_url && (
+                                <Tooltip title="PDF预览">
+                                    <Button
+                                        icon={<FilePdfOutlined/>}
+                                        onClick={() => handlePreview("pdf")}
+                                    />
+                                </Tooltip>
+                            )}
+
+                            {selectedContract.markdown_url && (
+                                <Tooltip title="Markdown预览">
+                                    <Button
+                                        icon={<FileTextOutlined/>}
+                                        onClick={() => handlePreview("markdown")}
+                                    />
+                                </Tooltip>
+                            )}
+
+                            {!selectedContract.pdf_url && !selectedContract.markdown_url && (
+                                <span style={{color: "#888"}}>暂无可预览文件</span>
+                            )}
+                        </Space>
+                    </Form.Item>
                 )}
 
+                {/* 2. 工程名称 */}
+                <Form.Item label="工程名称" name="projectName">
+                    <Input placeholder="可暂不填写，后续从送审资料中自动识别"/>
+                </Form.Item>
 
-                {currentStep === 1 && (
-                    <>
-                        <Form.Item
-                            label="合同名称"
-                            name="contractName"
-                            rules={[{required: true, message: "请输入合同名称"}]}
-                        >
-                            <Input placeholder="请输入合同名称"/>
-                        </Form.Item>
+                {/* 3. 审核委托书 */}
+                <Form.Item label="审核委托书" name="entrustFile">
+                    <Upload
+                        beforeUpload={() => false}   // 阻止自动上传
+                        maxCount={1}
+                    >
+                        <Button icon={<UploadOutlined/>}>选择文件</Button>
+                    </Upload>
+                </Form.Item>
 
-                        <Form.Item
-                            label="建设单位"
-                            name="constructionUnit"
-                            rules={[{required: true, message: "请输入建设单位"}]}
-                        >
-                            <Input placeholder="请输入建设单位"/>
-                        </Form.Item>
 
-                        <Form.Item
-                            label="施工单位"
-                            name="contractor"
-                            rules={[{required: true, message: "请输入施工单位"}]}
-                        >
-                            <Input placeholder="请输入施工单位"/>
-                        </Form.Item>
-                    </>
-                )}
+                {/* 4. 审核类型 */}
+                <Form.Item label="审核类型" name="auditType">
+                    <Select disabled>
+                        <Option value="竣工结算审核">竣工结算审核</Option>
+                    </Select>
+                </Form.Item>
 
-                {currentStep === 2 && (
-                    <>
-                        <Form.Item
-                            label="送审金额"
-                            name="sendAmount"
-                            rules={[{required: true, message: "请输入送审金额"}]}
-                        >
-                            <Input type="number" placeholder="请输入送审金额"/>
-                        </Form.Item>
+                {/* 5. 项目组成员（预留） */}
+                <Form.Item label="项目组成员（预留）">
+                    <Input.TextArea
+                        disabled
+                        rows={3}
+                        placeholder="此处后续对接人员系统，当前版本不支持配置"
+                    />
+                </Form.Item>
 
-                        <Form.Item
-                            label="审定金额"
-                            name="auditAmount"
-                            rules={[{required: true, message: "请输入审定金额"}]}
-                        >
-                            <Input type="number" placeholder="请输入审定金额"/>
-                        </Form.Item>
-                    </>
-                )}
-
-                {currentStep === 3 && (
-                    <div>
-                        <p>请确认以下信息无误后提交：</p>
-                        <pre>{JSON.stringify(form.getFieldsValue(), null, 2)}</pre>
-                    </div>
-                )}
+                {/* 6. 操作按钮 */}
+                <Form.Item>
+                    <Space>
+                        <Button type="primary" onClick={handleSubmit}>
+                            提交
+                        </Button>
+                        <Button onClick={() => navigate("/workbench/b223")}>
+                            取消
+                        </Button>
+                    </Space>
+                </Form.Item>
             </Form>
-
-            {/* 按钮 */}
-            <div style={{marginTop: 24}}>
-                <Space>
-                    {currentStep > 0 && <Button onClick={prev}>上一步</Button>}
-                    {currentStep < steps.length - 1 && <Button type="primary" onClick={next}>下一步</Button>}
-                    {currentStep === steps.length - 1 && <Button type="primary" onClick={handleSubmit}>提交</Button>}
-                </Space>
-            </div>
         </Card>
     );
 };
